@@ -1,0 +1,77 @@
+Introduction
+The installation of a supported Proxmox VE server should be done via Bare-metal_ISO_Installer. In some case it makes sense to install Proxmox VE on top of a running Debian Buster 64-bit, especially if you want a custom partition layout. For this HowTO the following Debian Buster ISO was used: [1].
+
+Install a standard Debian Buster (amd64)
+Install a standard Debian Buster, for details see Debian, and configure a static IP. It is recommended to only install the "standard" package selection, and nothing else, as Proxmox VE brings its own packages for qemu, lxc. A desktop environment is not necessary.
+
+Add an /etc/hosts entry for your IP address
+Please make sure that your machines hostname is resolvable via /etc/hosts, i.e. you need an entry in /etc/hosts which assigns an IPv4 address to its hostname.
+
+Note: Make sure that no IPv6 address for your hostname is specified in /etc/hosts.
+
+For instance, if your IP address is 192.168.15.77, and your hostname prox4m1, then your /etc/hosts file should look like:
+
+127.0.0.1       localhost.localdomain localhost
+192.168.15.77   prox4m1.proxmox.com prox4m1
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+You can test if your setup is ok using the hostname command:
+
+hostname --ip-address
+192.168.15.77 # should return your IP address here
+Install Proxmox VE
+Adapt your sources.list
+Add the Proxmox VE repository:
+
+echo "deb http://download.proxmox.com/debian/pve buster pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+Add the Proxmox VE repository key:
+
+wget http://download.proxmox.com/debian/proxmox-ve-release-6.x.gpg -O /etc/apt/trusted.gpg.d/proxmox-ve-release-6.x.gpg
+chmod +r /etc/apt/trusted.gpg.d/proxmox-ve-release-6.x.gpg  # optional, if you have a non-default umask
+Update your repository and system by running:
+
+apt update && apt full-upgrade
+NOTE: If you have enabled other another arch (typically, i386 to run some older software) and apt complains about not being able to find /binary-i386: "Unable to find expected entry 'pve/binary-i386/Packages'" you need to remove other arch or use instead the row:
+
+deb [arch=amd64] http://download.proxmox.com/debian/pve buster pve-no-subscription
+this is because Proxmox repository does not have any other arch besides amd64; more info about multiarch on debian at: https://wiki.debian.org/Multiarch/HOWTO.
+
+Install Proxmox VE packages
+Install the Proxmox VE packages
+
+apt install proxmox-ve postfix open-iscsi
+Configure packages which require user input on installation according to your needs (e.g. Samba asking about WINS/DHCP support). If you have a mail server in your network, you should configure postfix as a satellite system, your existing mail server will then be the relay host which will route the emails sent by the Proxmox server to their final recipient.
+
+If you don't know what to enter here, choose local only and leave the system name as is.
+
+Finally, reboot your system, the new Proxmox VE kernel should be automatically selected in the GRUB menu.
+
+Note: If you have a subscription key don't forget to switch to the enterprise repository after installation, see Package repositories.
+
+Recommended: remove the os-prober package
+The os-prober package scans all the partitions of your host, including those assigned to guests VMs, to create dual-boot GRUB entries. If you didn't install Proxmox VE as dual boot beside another Operating System, you can safely remove the os-prober package.
+
+apt remove os-prober
+Connect to the Proxmox VE web interface
+Connect to the admin web interface (https://youripaddress:8006). If you have a fresh install and didn't add any users yet, you should use the root account with your linux root password, and select "PAM Authentication" to log in.
+
+Once logged in, create a Linux Bridge called vmbr0, and add your first network interface to it.
+
+Adapt vmbr0 settings
+
+Troubleshooting
+resolv.conf gets overwritten
+The PVE GUI expects to control DNS management and will no longer take its DNS settings from /etc/network/interfaces. Any package that auto-generates (overwrites) /etc/resolv.conf will cause DNS to fail, e.g. packages 'resolvconf' for IPv4 and 'rdnssd' for IPv6.
+
+Optional Steps
+Optional: Remove the Debian kernel
+apt remove linux-image-amd64 'linux-image-4.19*'
+Update and check grub2 config by running:
+
+update-grub
+
+Finally install xShock Post Install Script
+wget https://raw.githubusercontent.com/extremeshok/xshok-proxmox/master/install-post.sh -c -O install-post.sh && bash install-post.sh && rm install-post.sh
